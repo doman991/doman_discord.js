@@ -12,7 +12,7 @@ This bot is primarily for personal use, ensuring my scripts remain secure and re
 ## Cogs
 
 ### Timer  
-The Timer cog enables administrators to set countdown timers directly in a Discord channel. Using the command `!timer <time> [optional message]`, an admin can trigger a countdown where the bot deletes the command message and posts a timestamped countdown in its place. The time must be between 5 seconds and 32 days, using units like `s` (seconds), `m` (minutes), `h` (hours), or `d` (days). Optionally, a custom message can be added. For example, `!timer 30m Break time ends!` starts a 30-minute countdown with the message "Break time ends! countDown" This is perfect for reminders or event scheduling.
+The Timer cog enables administrators to set countdown timers directly in a Discord channel. Using the command `!timer <time> [optional message]`, an admin can trigger a countdown where the bot deletes the command message and posts a timestamped countdown in its place. The time must be between 5 seconds and 32 days, using units like `s` (seconds), `m` (minutes), `h` (hours), or `d` (days). Optionally, a custom message can be added. For example, `!timer 30m Break time ends!` starts a 30-minute countdown with the message "Break time ends!" This is perfect for reminders or event scheduling.
 
 ### Remove  
 The Remove cog allows administrators to clean up a channel by deleting a specified number of messages. With the command `!remove <number>`, where `<number>` ranges from 1 to 100, the bot deletes that many messages before the command, logs the action in a designated log channel, and sends a confirmation message that auto-deletes after 2 seconds. For instance, `!remove 25` would remove the last 25 messages in the channel. This feature is useful for moderating chats while maintaining an action record.
@@ -22,3 +22,6 @@ The ClipOnly cog enforces a video-only rule in a specific channel. When a messag
 
 ### AutoRanks  
 The AutoRanks cog manages user roles through reactions to an embed message listing various games, each tied to a unique emoji. When a user reacts with a game’s emoji, they receive a role that likely provides notifications for updates about that game; removing the reaction revokes the role. The embed updates if it exists or is sent as a new message if it doesn’t. For example, reacting with the emoji for Minecraft assigns the Minecraft update notification role. This lets users self-manage their notification preferences effortlessly.
+
+### Movies  
+The Movies cog provides a system for managing a movie watchlist with commands like `!movieAdd <name>` to suggest movies, `!movieList` to view all movies, and `!rmovie` to pick a random unwatched movie (cooldown: 7 days post-watch). Admins can approve/reject suggestions via reactions in a log channel, mark movies as watched with `!watched <id>`, remove them from random selection with `!removeMovie <id>`, or edit titles with `!editMovie <id> <newTitle>`. For example, `!movieAdd Inception` submits "Inception" for approval, and once approved, it’s added to the pool. This cog is ideal for collaborative movie night planning.
