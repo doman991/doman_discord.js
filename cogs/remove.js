@@ -1,17 +1,21 @@
 module.exports = (client) => {
     const prefix = '!'; // Your bot's prefix
-    const logChannelId = ''; // Replace with your log channel ID
+    const logChannelId = '1209916563512238169'; // Replace with your log channel ID
 
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
 
-        if (message.content.startsWith(`${prefix}remove`)) {
-            const args = message.content.split(' ');
+        // Split the message content into words
+        const args = message.content.split(' ');
+        const command = args[0].toLowerCase();
+
+        // Check for exact match of "!remove"
+        if (command === `${prefix}remove`) {
             const count = parseInt(args[1]);
 
             // Validate the input
-            if (isNaN(count) || count < 1 || count > 100) {
-                await message.reply('Please provide a number between 1 and 100.');
+            if (args.length < 2 || isNaN(count) || count < 1 || count > 100) {
+                await message.reply('Please provide a number between 1 and 100, e.g., `!remove 4`.');
                 return;
             }
 
@@ -24,11 +28,11 @@ module.exports = (client) => {
 
             try {
                 // Fetch 'count' messages before the command message
-                const messagesToDelete = await message.channel.messages.fetch({ 
-                    limit: count, 
-                    before: message.id 
+                const messagesToDelete = await message.channel.messages.fetch({
+                    limit: count,
+                    before: message.id
                 });
-                
+
                 // Delete the fetched messages
                 const deleted = await message.channel.bulkDelete(messagesToDelete, true);
                 const deletedCount = deleted.size;
