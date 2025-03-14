@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = (client) => {
-    const CHANNEL_ID = ''; // Replace with ID of channel where to send embed
-    const EMBED_MESSAGE_ID = ''; // Replace with your embed’s message ID
+    const CHANNEL_ID = '1345546588424245268'; // Replace with your embed’s channel ID
+    const EMBED_MESSAGE_ID = '1345576571460784139'; // Replace with your embed’s message ID
 
     const roleMapping = {
         'diablo4': { roleId: '1345560992188465212', emojiId: '1345563858437275658' },
@@ -15,7 +15,8 @@ module.exports = (client) => {
         'enshrouded': { roleId: '1345560739535912980', emojiId: '1345563785892724838' },
         'rust': { roleId: '1345560708779081841', emojiId: '1345563958505115758' },
         'cs2': { roleId: '1345560668258041999', emojiId: '1345563832235331684' },
-        'minecraft': { roleId: '1345560413001220219', emojiId: '1345564126381867089' }
+        'minecraft': { roleId: '1345560413001220219', emojiId: '1345564126381867089' },
+        'lol': { roleId: '1350068688824307794', emojiId: '1350175765207060511' }
     };
 
     async function sendOrUpdateEmbed() {
@@ -27,44 +28,55 @@ module.exports = (client) => {
                 return;
             }
             console.log('Channel fetched successfully:', channel.name);
-//Embed starts here
+
             const embed = new EmbedBuilder()
-                .setTitle('📰 Roles: Game Updates')
+                .setTitle('📰 Rangi: Aktualizacje Gier')
                 .setDescription(
-                    'React to the appropriate icon to receive notifications about updates for selected games!\n\n' +
-                    '<:minecraft:1345564126381867089> **Updates for Minecraft**\n' +
-                    '<:cs2:1345563832235331684> **Updates for Counter-Strike 2**\n' +
-                    '<:rust:1345563958505115758> **Updates for Rust**\n' +
-                    '<:enshrouded:1345563785892724838> **Updates for Enshrouded**\n' +
-                    '<:valheim:1345563991736451122> **Updates for Valheim**\n' +
-                    '<:poe1:1345565345297207409> **Updates for Path of Exile**\n' +
-                    '<:poe2:1345564198058332280> **Updates for Path of Exile 2**\n' +
-                    '<:lastepo:1345563725431574528> **Updates for Last Epoch**\n' +
-                    '<:wow:1345564812570001418> **Updates for WoWHead (World of Warcraft News)**\n' +
-                    '<:wowhead:1345564053703102475> **Updates for World of Warcraft**\n' +
-                    '<:diablo4:1345563858437275658> **Updates for Diablo IV**\n\n' +
-                    '*React with the appropriate emoji below to receive notifications!*'
+                    'Reaguj na odpowiednią ikonę, aby otrzymywać powiadomienia o aktualizacjach wybranych gier!\n\n' +
+                    '<:minecraft:1345564126381867089> **Aktualizacje do Minecraft**\n' +
+                    '<:cs2:1345563832235331684> **Aktualizacje do Counter-Strike 2**\n' +
+                    '<:rust:1345563958505115758> **Aktualizacje do Rust**\n' +
+                    '<:enshrouded:1345563785892724838> **Aktualizacje do Enshrouded**\n' +
+                    '<:valheim:1345563991736451122> **Aktualizacje do Valheim**\n' +
+                    '<:poe1:1345565345297207409> **Aktualizacje do Path of Exile**\n' +
+                    '<:poe2:1345564198058332280> **Aktualizacje do Path of Exile 2**\n' +
+                    '<:lastepo:1345563725431574528> **Aktualizacje do Last Epoch**\n' +
+                    '<:wow:1345564812570001418> **Aktualizacje do WoWHead (World of Warcraft News)**\n' +
+                    '<:wowhead:1345564053703102475> **Aktualizacje do World of Warcraft**\n' +
+                    '<:diablo4:1345563858437275658> **Aktualizacje do Diablo IV**\n' +
+                    '<:lol:1350175765207060511> **Aktualizacje do League Of Legends**\n\n' +
+                    '*Kliknij odpowiednią reakcję poniżej, aby otrzymać powiadomienia!*'
                 )
                 .setColor('#00b7ff')
-                .setFooter({ text: 'Automatic notification system | React to join!' });
-//End of embed
+                .setFooter({ text: 'Automatyczny system powiadomień | Reaguj, aby dołączyć!' });
+
+            let message;
             try {
                 console.log('Attempting to fetch message with ID:', EMBED_MESSAGE_ID);
-                const message = await channel.messages.fetch(EMBED_MESSAGE_ID);
+                message = await channel.messages.fetch(EMBED_MESSAGE_ID);
                 await message.edit({ embeds: [embed] });
                 console.log('Embed updated successfully.');
             } catch (fetchError) {
                 console.log('Failed to fetch message, sending a new one...');
-                const newMessage = await channel.send({ embeds: [embed] });
-                console.log('New embed message sent. ID:', newMessage.id);
-                for (const key in roleMapping) {
-                    const emoji = client.emojis.cache.get(roleMapping[key].emojiId);
-                    if (emoji) {
-                        await newMessage.react(emoji);
+                message = await channel.send({ embeds: [embed] });
+                console.log('New embed message sent. ID:', message.id);
+            }
+
+            // Add missing reactions from roleMapping
+            const currentReactions = message.reactions.cache;
+            for (const key in roleMapping) {
+                const emojiId = roleMapping[key].emojiId;
+                const emoji = client.emojis.cache.get(emojiId);
+                if (emoji) {
+                    const reaction = currentReactions.get(emojiId);
+                    if (!reaction) {
+                        await message.react(emoji);
                         console.log(`Added reaction for ${key}`);
                     } else {
-                        console.log(`Emoji ${roleMapping[key].emojiId} not found.`);
+                        console.log(`Reaction for ${key} already exists`);
                     }
+                } else {
+                    console.log(`Emoji ${emojiId} not found in cache`);
                 }
             }
         } catch (error) {
