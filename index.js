@@ -17,8 +17,8 @@ const client = new Client({
 });
 
 // Store admin IDs and debug channel ID on the client for reference across cogs
-client.adminIds = ['', ''];
-client.debugChannelId = ''; // Centralized debug channel ID
+client.adminIds = ['333637419679219713', '241879263630852097'];
+client.debugChannelId = '1209916563512238169'; // Centralized debug channel ID
 
 client.debug = async (message) => {
     try {
