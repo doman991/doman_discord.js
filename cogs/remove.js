@@ -1,6 +1,8 @@
+const { updateRemovalStats, getTotalRemovedMessages, getUserRemovedMessages } = require('../database');
+const { EmbedBuilder } = require('discord.js');
+
 module.exports = (client) => {
     const prefix = '!'; // Your bot's prefix
-    const logChannelId = '1209916563512238169'; // Replace with your log channel ID
 
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
@@ -41,13 +43,29 @@ module.exports = (client) => {
                 await message.delete();
                 const totalDeleted = deletedCount + 1;
 
-                // Log the action
-                const logChannel = client.channels.cache.get(logChannelId);
+                // Update removal stats in the database
+                await updateRemovalStats(message.author.id, totalDeleted);
+
+                // Get total removed messages stats
+                const totalRemoved = await getTotalRemovedMessages();
+                const userRemoved = await getUserRemovedMessages(message.author.id);
+
+                // Create embed for logging
+                const embed = new EmbedBuilder()
+                    .setColor('#FF0000') // Red color for removal
+                    .setTitle(`${totalDeleted} messages removed by ${message.author.username} in #${message.channel.name}`)
+                    .addFields(
+                        { name: 'Total Removed Messages', value: `${totalRemoved}`, inline: true },
+                        { name: `Total Removed by ${message.author.username}`, value: `${userRemoved}`, inline: true }
+                    )
+                    .setTimestamp();
+
+                // Send embed to debug channel
+                const logChannel = await client.channels.fetch(client.debugChannelId);
                 if (logChannel) {
-                    const logMessage = `${totalDeleted} messages removed by ${message.author.username} in ${message.channel.name}`;
-                    await logChannel.send(logMessage);
+                    await logChannel.send({ embeds: [embed] });
                 } else {
-                    console.warn('Log channel not found');
+                    console.warn('Debug channel not found');
                 }
 
                 // Send a temporary confirmation message
