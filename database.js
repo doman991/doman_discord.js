@@ -99,7 +99,7 @@ async function initDatabase() {
         `;
         await pool.execute(createRemovalStatsTableQuery);
 
-        // Create the user_stats table with nickname column
+        // Create the user_stats table with new voice_chat_time and streaming_time columns
         const createUserStatsTableQuery = `
             CREATE TABLE IF NOT EXISTS user_stats (
                 user_id VARCHAR(255) PRIMARY KEY,
@@ -111,6 +111,8 @@ async function initDatabase() {
                 total_swears INT DEFAULT 0,
                 reactions_given INT DEFAULT 0,
                 reactions_received INT DEFAULT 0,
+                voice_chat_time BIGINT DEFAULT 0,  -- New column for voice chat time in seconds
+                streaming_time BIGINT DEFAULT 0,   -- New column for streaming time in seconds
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
         `;
@@ -283,10 +285,10 @@ async function getUserRemovedMessages(userId) {
 }
 
 // Updated upsertUserStats function with COALESCE to handle NULL values
-async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edited = 0, swears = 0, reactionsGiven = 0, reactionsReceived = 0, nickname = null) {
+async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edited = 0, swears = 0, reactionsGiven = 0, reactionsReceived = 0, voiceChatTime = 0, streamingTime = 0, nickname = null) {
     const query = `
-        INSERT INTO user_stats (user_id, nickname, total_messages, total_words, messages_removed, messages_edited, total_swears, reactions_given, reactions_received)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO user_stats (user_id, nickname, total_messages, total_words, messages_removed, messages_edited, total_swears, reactions_given, reactions_received, voice_chat_time, streaming_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             nickname = COALESCE(VALUES(nickname), nickname),
             total_messages = COALESCE(total_messages, 0) + VALUES(total_messages),
@@ -296,11 +298,13 @@ async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edi
             total_swears = COALESCE(total_swears, 0) + VALUES(total_swears),
             reactions_given = COALESCE(reactions_given, 0) + VALUES(reactions_given),
             reactions_received = COALESCE(reactions_received, 0) + VALUES(reactions_received),
+            voice_chat_time = COALESCE(voice_chat_time, 0) + VALUES(voice_chat_time),
+            streaming_time = COALESCE(streaming_time, 0) + VALUES(streaming_time),
             last_updated = CURRENT_TIMESTAMP
     `;
     try {
-        await pool.execute(query, [userId, nickname, messages, words, removed, edited, swears, reactionsGiven, reactionsReceived]);
-        console.log(`Updated stats for user ${userId}: messages +${messages}, words +${words}, removed +${removed}, edited +${edited}, swears +${swears}, reactions_given +${reactionsGiven}, reactions_received +${reactionsReceived}`);
+        await pool.execute(query, [userId, nickname, messages, words, removed, edited, swears, reactionsGiven, reactionsReceived, voiceChatTime, streamingTime]);
+        console.log(`Updated stats for user ${userId}: messages +${messages}, words +${words}, removed +${removed}, edited +${edited}, swears +${swears}, reactions_given +${reactionsGiven}, reactions_received +${reactionsReceived}, voice_chat_time +${voiceChatTime}, streaming_time +${streamingTime}`);
     } catch (error) {
         console.error(`Failed to update stats for user ${userId}:`, error);
         throw error;
@@ -313,7 +317,6 @@ async function getUserStats(userId) {
     return rows.length > 0 ? rows[0] : null;
 }
 
-// Added function to fetch all user stats
 async function getAllUserStats() {
     const query = 'SELECT * FROM user_stats';
     const [rows] = await pool.execute(query);
@@ -344,5 +347,5 @@ module.exports = {
     getUserRemovedMessages,
     upsertUserStats,
     getUserStats,
-    getAllUserStats // Added to exports
+    getAllUserStats
 };
