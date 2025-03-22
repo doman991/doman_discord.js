@@ -136,7 +136,7 @@ module.exports = (client) => {
 
             // Send the embed and schedule deletion
             const reply = await message.channel.send({ embeds: [embed] });
-            const deleteAt = new Date(currentTimeMs + 120 * 1000); // 2 minutes
+            const deleteAt = new Date(currentTimeMs + 300 * 1000); // 5 minutes
             await insertMessageToDelete(message.channel.id, message.id, deleteAt, null);
             await insertMessageToDelete(reply.channel.id, reply.id, deleteAt, null);
         }
