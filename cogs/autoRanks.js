@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = (client) => {
-    const CHANNEL_ID = '1345546588424245268'; // Replace with your embed’s channel ID
-    const EMBED_MESSAGE_ID = '1345576571460784139'; // Replace with your embed’s message ID
+    const CHANNEL_ID = '';
+    const EMBED_MESSAGE_ID = ''; // Replace with your embed’s message ID
 
     const roleMapping = {
         'diablo4': { roleId: '1345560992188465212', emojiId: '1345563858437275658' },
