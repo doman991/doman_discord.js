@@ -99,6 +99,23 @@ async function initDatabase() {
         `;
         await pool.execute(createRemovalStatsTableQuery);
 
+        // Create the user_stats table with nickname column
+        const createUserStatsTableQuery = `
+            CREATE TABLE IF NOT EXISTS user_stats (
+                user_id VARCHAR(255) PRIMARY KEY,
+                nickname VARCHAR(50),
+                total_messages INT DEFAULT 0,
+                total_words INT DEFAULT 0,
+                messages_removed INT DEFAULT 0,
+                messages_edited INT DEFAULT 0,
+                total_swears INT DEFAULT 0,
+                reactions_given INT DEFAULT 0,
+                reactions_received INT DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `;
+        await pool.execute(createUserStatsTableQuery);
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Database initialization failed:', error);
@@ -265,6 +282,44 @@ async function getUserRemovedMessages(userId) {
     return rows.length > 0 ? rows[0].total_removed : 0;
 }
 
+// Updated upsertUserStats function with COALESCE to handle NULL values
+async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edited = 0, swears = 0, reactionsGiven = 0, reactionsReceived = 0, nickname = null) {
+    const query = `
+        INSERT INTO user_stats (user_id, nickname, total_messages, total_words, messages_removed, messages_edited, total_swears, reactions_given, reactions_received)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            nickname = COALESCE(VALUES(nickname), nickname),
+            total_messages = COALESCE(total_messages, 0) + VALUES(total_messages),
+            total_words = COALESCE(total_words, 0) + VALUES(total_words),
+            messages_removed = COALESCE(messages_removed, 0) + VALUES(messages_removed),
+            messages_edited = COALESCE(messages_edited, 0) + VALUES(messages_edited),
+            total_swears = COALESCE(total_swears, 0) + VALUES(total_swears),
+            reactions_given = COALESCE(reactions_given, 0) + VALUES(reactions_given),
+            reactions_received = COALESCE(reactions_received, 0) + VALUES(reactions_received),
+            last_updated = CURRENT_TIMESTAMP
+    `;
+    try {
+        await pool.execute(query, [userId, nickname, messages, words, removed, edited, swears, reactionsGiven, reactionsReceived]);
+        console.log(`Updated stats for user ${userId}: messages +${messages}, words +${words}, removed +${removed}, edited +${edited}, swears +${swears}, reactions_given +${reactionsGiven}, reactions_received +${reactionsReceived}`);
+    } catch (error) {
+        console.error(`Failed to update stats for user ${userId}:`, error);
+        throw error;
+    }
+}
+
+async function getUserStats(userId) {
+    const query = 'SELECT * FROM user_stats WHERE user_id = ?';
+    const [rows] = await pool.execute(query, [userId]);
+    return rows.length > 0 ? rows[0] : null;
+}
+
+// Added function to fetch all user stats
+async function getAllUserStats() {
+    const query = 'SELECT * FROM user_stats';
+    const [rows] = await pool.execute(query);
+    return rows;
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
@@ -286,5 +341,8 @@ module.exports = {
     incrementUserField,
     updateRemovalStats,
     getTotalRemovedMessages,
-    getUserRemovedMessages
+    getUserRemovedMessages,
+    upsertUserStats,
+    getUserStats,
+    getAllUserStats // Added to exports
 };
