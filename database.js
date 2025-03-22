@@ -23,34 +23,45 @@ console.log('Attempting to connect to MySQL with:', {
 // Initialize the database and check for necessary tables and columns
 async function initDatabase() {
     try {
-        // Create the messages_to_delete table if it doesn't exist (existing functionality)
+        // Create or update the messages_to_delete table
         const createMessagesTableQuery = `
             CREATE TABLE IF NOT EXISTS messages_to_delete (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 channel_id VARCHAR(255),
                 message_id VARCHAR(255),
-                delete_at TIMESTAMP
+                delete_at TIMESTAMP,
+                log_message_id VARCHAR(255),
+                status TINYINT DEFAULT 2, -- 1: removed, 2: to be removed, 3: error
+                error_log TEXT DEFAULT NULL
             )
         `;
         await pool.execute(createMessagesTableQuery);
 
-        // Check if log_message_id column exists in messages_to_delete
-        const [rowsMessages] = await pool.execute(`
+        // Check and add status column if it doesn’t exist
+        const [rowsStatus] = await pool.execute(`
             SELECT COLUMN_NAME
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_NAME = 'messages_to_delete'
-            AND COLUMN_NAME = 'log_message_id'
+            AND COLUMN_NAME = 'status'
         `);
-        if (rowsMessages.length === 0) {
-            const alterMessagesTableQuery = `
-                ALTER TABLE messages_to_delete
-                ADD COLUMN log_message_id VARCHAR(255)
-            `;
-            await pool.execute(alterMessagesTableQuery);
-            console.log('Added log_message_id column to messages_to_delete');
+        if (rowsStatus.length === 0) {
+            await pool.execute(`ALTER TABLE messages_to_delete ADD COLUMN status TINYINT DEFAULT 2`);
+            console.log('Added status column to messages_to_delete');
         }
 
-        // Create the movies table for the movies.js cog
+        // Check and add error_log column if it doesn’t exist
+        const [rowsErrorLog] = await pool.execute(`
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'messages_to_delete'
+            AND COLUMN_NAME = 'error_log'
+        `);
+        if (rowsErrorLog.length === 0) {
+            await pool.execute(`ALTER TABLE messages_to_delete ADD COLUMN error_log TEXT DEFAULT NULL`);
+            console.log('Added error_log column to messages_to_delete');
+        }
+
+        // Create the movies table
         const createMoviesTableQuery = `
             CREATE TABLE IF NOT EXISTS movies (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,42 +73,86 @@ async function initDatabase() {
         `;
         await pool.execute(createMoviesTableQuery);
 
+        // Create the user_data table
+        const createUserDataTableQuery = `
+            CREATE TABLE IF NOT EXISTS user_data (
+                user_id VARCHAR(255) PRIMARY KEY,
+                roles TEXT,
+                connections INT DEFAULT 0,
+                first_join_date TIMESTAMP DEFAULT '2024-03-10 00:00:00',
+                kicks INT DEFAULT 0,
+                bans INT DEFAULT 0,
+                inviter_id VARCHAR(255) DEFAULT '0'
+            )
+        `;
+        await pool.execute(createUserDataTableQuery);
+
+        // Create the message_removal_stats table
+        const createRemovalStatsTableQuery = `
+            CREATE TABLE IF NOT EXISTS message_removal_stats (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                total_removed INT DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_user (user_id)
+            )
+        `;
+        await pool.execute(createRemovalStatsTableQuery);
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Database initialization failed:', error);
-        throw error; // Re-throw to let index.js handle it
+        throw error;
     }
 }
 
-// Existing functions for messages_to_delete
+// Functions for messages_to_delete
 async function insertMessageToDelete(channelId, messageId, deleteAt, logMessageId = null) {
     const mysqlDateTime = new Date(deleteAt).toISOString().replace('T', ' ').split('.')[0];
-    const query = 'INSERT INTO messages_to_delete (channel_id, message_id, delete_at, log_message_id) VALUES (?, ?, ?, ?)';
-    await pool.execute(query, [channelId, messageId, mysqlDateTime, logMessageId]);
+    const query = `
+        INSERT INTO messages_to_delete (channel_id, message_id, delete_at, log_message_id, status)
+        VALUES (?, ?, ?, ?, 2)
+    `;
+    try {
+        await pool.execute(query, [channelId, messageId, mysqlDateTime, logMessageId]);
+        console.log(`Inserted message ${messageId} into messages_to_delete with delete_at ${mysqlDateTime}`);
+    } catch (error) {
+        console.error(`Failed to insert message ${messageId} into messages_to_delete:`, error);
+        throw error;
+    }
 }
 
 async function getOverdueMessages() {
-    const query = 'SELECT id, channel_id, message_id, delete_at, log_message_id FROM messages_to_delete WHERE delete_at <= NOW()';
+    const query = `
+        SELECT id, channel_id, message_id, delete_at, log_message_id
+        FROM messages_to_delete
+        WHERE delete_at <= NOW() AND status = 2
+    `;
     const [rows] = await pool.execute(query);
     return rows;
 }
 
-async function deleteMessageRecord(id) {
-    const query = 'DELETE FROM messages_to_delete WHERE id = ?';
+async function markMessageCompleted(id) {
+    const query = 'UPDATE messages_to_delete SET status = 1 WHERE id = ?';
     await pool.execute(query, [id]);
 }
 
+async function markMessageErrored(id, errorMessage) {
+    const query = 'UPDATE messages_to_delete SET status = 3, error_log = ? WHERE id = ?';
+    await pool.execute(query, [errorMessage, id]);
+}
+
 async function getMessageRecordByMessageId(messageId) {
-    const query = 'SELECT id, channel_id, message_id, delete_at, log_message_id FROM messages_to_delete WHERE message_id = ?';
+    const query = 'SELECT id, channel_id, message_id, delete_at, log_message_id, status, error_log FROM messages_to_delete WHERE message_id = ?';
     const [rows] = await pool.execute(query, [messageId]);
     return rows.length > 0 ? rows[0] : null;
 }
 
-// New functions for movies table
+// Functions for movies table
 async function addMovie(title) {
     const query = 'INSERT INTO movies (title) VALUES (?)';
     const [result] = await pool.execute(query, [title]);
-    return result.insertId; // Return the ID of the newly inserted movie
+    return result.insertId;
 }
 
 async function approveMovie(id) {
@@ -152,11 +207,70 @@ async function getRandomMovie(daysCooldown) {
     return rows.length > 0 ? rows[0] : null;
 }
 
+// Functions for user_data table
+async function upsertUserData(userId, roles = [], connections = 0, firstJoinDate = null, kicks = 0, bans = 0, inviterId = '0') {
+    const mysqlDateTime = firstJoinDate ? new Date(firstJoinDate).toISOString().replace('T', ' ').split('.')[0] : '2024-03-10 00:00:00';
+    const query = `
+        INSERT INTO user_data (user_id, roles, connections, first_join_date, kicks, bans, inviter_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            roles = VALUES(roles),
+            connections = VALUES(connections),
+            first_join_date = COALESCE(first_join_date, VALUES(first_join_date)),
+            kicks = VALUES(kicks),
+            bans = VALUES(bans),
+            inviter_id = VALUES(inviter_id)
+    `;
+    await pool.execute(query, [userId, JSON.stringify(roles), connections, mysqlDateTime, kicks, bans, inviterId]);
+}
+
+async function getUserData(userId) {
+    const query = 'SELECT * FROM user_data WHERE user_id = ?';
+    const [rows] = await pool.execute(query, [userId]);
+    return rows.length > 0 ? rows[0] : null;
+}
+
+async function incrementUserField(userId, field) {
+    const query = `UPDATE user_data SET ${field} = ${field} + 1 WHERE user_id = ?`;
+    await pool.execute(query, [userId]);
+}
+
+// Functions for message_removal_stats table
+async function updateRemovalStats(userId, count) {
+    const query = `
+        INSERT INTO message_removal_stats (user_id, total_removed)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE
+            total_removed = total_removed + VALUES(total_removed),
+            last_updated = CURRENT_TIMESTAMP
+    `;
+    try {
+        await pool.execute(query, [userId, count]);
+        console.log(`Updated removal stats for user ${userId}: added ${count} messages`);
+    } catch (error) {
+        console.error(`Failed to update removal stats for user ${userId}:`, error);
+        throw error;
+    }
+}
+
+async function getTotalRemovedMessages() {
+    const query = 'SELECT SUM(total_removed) as total FROM message_removal_stats';
+    const [rows] = await pool.execute(query);
+    return rows[0].total || 0;
+}
+
+async function getUserRemovedMessages(userId) {
+    const query = 'SELECT total_removed FROM message_removal_stats WHERE user_id = ?';
+    const [rows] = await pool.execute(query, [userId]);
+    return rows.length > 0 ? rows[0].total_removed : 0;
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
     getOverdueMessages,
-    deleteMessageRecord,
+    markMessageCompleted,
+    markMessageErrored,
     getMessageRecordByMessageId,
     addMovie,
     approveMovie,
@@ -166,5 +280,11 @@ module.exports = {
     markMovieWatched,
     removeMovieFromPool,
     editMovieTitle,
-    getRandomMovie
+    getRandomMovie,
+    upsertUserData,
+    getUserData,
+    incrementUserField,
+    updateRemovalStats,
+    getTotalRemovedMessages,
+    getUserRemovedMessages
 };
