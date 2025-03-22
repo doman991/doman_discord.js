@@ -2,24 +2,26 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
 const config = require('./config.json');
 const { initDatabase } = require('./database');
-require('dotenv').config(); // Load environment variables
+require('dotenv').config();
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions // Added for reaction handling
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildBans
     ]
 });
 
-// Store admin IDs on the client for reference across cogs
-client.adminIds = ['adminID', 'adminID']; // Add your admin IDs
+// Store admin IDs and debug channel ID on the client for reference across cogs
+client.adminIds = ['', ''];
+client.debugChannelId = ''; // Centralized debug channel ID
 
 client.debug = async (message) => {
     try {
-        const debugChannelId = ''; // Add log channel ID
-        const debugChannel = await client.channels.fetch(debugChannelId);
+        const debugChannel = await client.channels.fetch(client.debugChannelId);
         if (debugChannel) await debugChannel.send(message);
     } catch (error) {
         console.error('Failed to send debug message:', error);
@@ -53,4 +55,4 @@ client.once('ready', async () => {
     }
 });
 
-client.login(process.env.BOT_TOKEN || config.token); // Prefer .env token
+client.login(process.env.BOT_TOKEN || config.token);
