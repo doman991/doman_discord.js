@@ -118,6 +118,20 @@ async function initDatabase() {
         `;
         await pool.execute(createUserStatsTableQuery);
 
+        // Create the activities table for tracking gaming sessions
+        const createActivitiesTableQuery = `
+            CREATE TABLE IF NOT EXISTS activities (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255),
+                nickname VARCHAR(255),
+                activity_name VARCHAR(255),
+                session_start TIMESTAMP,
+                session_end TIMESTAMP,
+                INDEX (user_id, activity_name)
+            )
+        `;
+        await pool.execute(createActivitiesTableQuery);
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Database initialization failed:', error);
@@ -323,6 +337,65 @@ async function getAllUserStats() {
     return rows;
 }
 
+// New functions for activities table
+async function startActivitySession(userId, nickname, activityName, startTime) {
+    const mysqlDateTime = new Date(startTime).toISOString().replace('T', ' ').split('.')[0];
+    const query = `
+        INSERT INTO activities (user_id, nickname, activity_name, session_start)
+        VALUES (?, ?, ?, ?)
+    `;
+    try {
+        await pool.execute(query, [userId, nickname, activityName, mysqlDateTime]);
+        console.log(`Started activity session for user ${userId}: ${activityName}`);
+    } catch (error) {
+        console.error(`Failed to start activity session for user ${userId}:`, error);
+        throw error;
+    }
+}
+
+async function endActivitySession(userId, activityName, endTime) {
+    const mysqlDateTime = new Date(endTime).toISOString().replace('T', ' ').split('.')[0];
+    const query = `
+        UPDATE activities
+        SET session_end = ?
+        WHERE user_id = ? AND activity_name = ? AND session_end IS NULL
+        ORDER BY session_start DESC
+        LIMIT 1
+    `;
+    try {
+        await pool.execute(query, [mysqlDateTime, userId, activityName]);
+        console.log(`Ended activity session for user ${userId}: ${activityName}`);
+    } catch (error) {
+        console.error(`Failed to end activity session for user ${userId}:`, error);
+        throw error;
+    }
+}
+
+async function getActivityStats(userId, period = 'all') {
+    let dateCondition = '';
+    if (period === 'week') {
+        dateCondition = 'AND session_start >= NOW() - INTERVAL 7 DAY';
+    } else if (period === 'month') {
+        dateCondition = 'AND session_start >= NOW() - INTERVAL 30 DAY';
+    }
+
+    const query = `
+        SELECT activity_name,
+               COUNT(*) as session_count,
+               SUM(TIMESTAMPDIFF(SECOND, session_start, IFNULL(session_end, NOW()))) as total_playtime
+        FROM activities
+        WHERE user_id = ? ${dateCondition}
+        GROUP BY activity_name
+    `;
+    try {
+        const [rows] = await pool.execute(query, [userId]);
+        return rows;
+    } catch (error) {
+        console.error(`Failed to get activity stats for user ${userId}:`, error);
+        throw error;
+    }
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
@@ -347,5 +420,9 @@ module.exports = {
     getUserRemovedMessages,
     upsertUserStats,
     getUserStats,
-    getAllUserStats
+    getAllUserStats,
+    startActivitySession,
+    endActivitySession,
+    getActivityStats,
+    pool // Add this line
 };
