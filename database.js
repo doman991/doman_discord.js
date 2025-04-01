@@ -422,6 +422,12 @@ async function getSwearWords() {
     return rows.map(row => row.word);
 }
 
+async function checkSwearWordExists(word) {
+    const query = 'SELECT COUNT(*) as count FROM swear_words WHERE word = ?';
+    const [rows] = await pool.execute(query, [word.toLowerCase()]);
+    return rows[0].count > 0;
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
@@ -451,7 +457,8 @@ module.exports = {
     startActivitySession,
     endActivitySession,
     getActivityStats,
-    addSwearWord,   // Added function to add a swear word
-    getSwearWords,  // Added function to get all swear words
+    addSwearWord,   // Function to add a swear word
+    getSwearWords,  // Function to get all swear words
+    checkSwearWordExists, // Function to check if a swear word exists
     pool
 };
