@@ -132,6 +132,15 @@ async function initDatabase() {
         `;
         await pool.execute(createActivitiesTableQuery);
 
+        // Create the swear_words table for storing swear words
+        const createSwearWordsTableQuery = `
+            CREATE TABLE IF NOT EXISTS swear_words (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                word VARCHAR(255) NOT NULL UNIQUE
+            )
+        `;
+        await pool.execute(createSwearWordsTableQuery);
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Database initialization failed:', error);
@@ -401,13 +410,25 @@ async function getActivityStats(userId, period = 'all') {
     }
 }
 
+// New functions for swear_words table
+async function addSwearWord(word) {
+    const query = 'INSERT IGNORE INTO swear_words (word) VALUES (?)';
+    await pool.execute(query, [word.toLowerCase()]);
+}
+
+async function getSwearWords() {
+    const query = 'SELECT word FROM swear_words';
+    const [rows] = await pool.execute(query);
+    return rows.map(row => row.word);
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
     getOverdueMessages,
     markMessageCompleted,
     markMessageErrored,
-    deleteMessageRecord, // Added this function to exports
+    deleteMessageRecord,
     getMessageRecordByMessageId,
     addMovie,
     approveMovie,
@@ -430,5 +451,7 @@ module.exports = {
     startActivitySession,
     endActivitySession,
     getActivityStats,
+    addSwearWord,   // Added function to add a swear word
+    getSwearWords,  // Added function to get all swear words
     pool
 };
