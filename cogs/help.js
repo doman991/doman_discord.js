@@ -36,7 +36,8 @@ module.exports = (client) => {
                             '`!editMovie <id> <newTitle>`: Edit a movie’s title (Admins only).',
                             '`!remove <count>`: Remove a specified number of messages (1-100) (Admins only).',
                             '`!timer <duration> [optional message]`: Set a countdown timer (e.g., `!timer 30m`) (Admins only).',
-                            '`!user <userid> or !user @user`: Show user information (Admins only).'
+                            '`!user <userid> or !user @user`: Show user information (Admins only).',
+                            '`!swear <text>`: Add a swear word to the list (Admins only).'
                         ].join('\n'),
                         inline: false
                     }
