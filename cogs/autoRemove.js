@@ -1,4 +1,4 @@
-const { getOverdueMessages, markMessageCompleted, markMessageErrored, updateRemovalStats } = require('../database');
+const { getOverdueMessages, markMessageErrored, updateRemovalStats, deleteMessageRecord } = require('../database');
 
 module.exports = (client) => {
     const INTERVAL_SECONDS = 10; // Run every 10 seconds (configurable)
@@ -21,7 +21,7 @@ module.exports = (client) => {
         }
     };
 
-    // Delete overdue messages and update their status
+    // Delete overdue messages and manage database records
     const deleteOverdueMessages = async () => {
         const overdueMessages = await getOverdueMessages();
         for (const msg of overdueMessages) {
@@ -29,7 +29,9 @@ module.exports = (client) => {
                 const channel = client.channels.cache.get(msg.channel_id);
                 if (channel) {
                     try {
+                        // Fetch the message to confirm it exists
                         const message = await channel.messages.fetch(msg.message_id);
+                        // Delete the message
                         await message.delete();
                         const deletionTime = new Date().toISOString().replace('T', ' ').split('.')[0];
                         sendDebug(`Deleted message ${msg.message_id} at ${deletionTime}`);
@@ -37,6 +39,7 @@ module.exports = (client) => {
                         // Update removal stats for the bot
                         await updateRemovalStats(client.user.id, 1);
 
+                        // Clean up log message if it exists
                         if (msg.log_message_id) {
                             const debugChannel = await client.channels.fetch(client.debugChannelId);
                             if (debugChannel) {
@@ -46,11 +49,14 @@ module.exports = (client) => {
                                 // await updateRemovalStats(client.user.id, 1);
                             }
                         }
-                        await markMessageCompleted(msg.id);
+
+                        // Remove the record from the database since deletion succeeded
+                        await deleteMessageRecord(msg.id);
                     } catch (fetchError) {
-                        if (fetchError.code === 10008) { // Unknown Message
-                            await markMessageCompleted(msg.id);
-                            sendDebug(`Marked non-existent message ${msg.message_id} as completed`);
+                        if (fetchError.code === 10008) { // Unknown Message (already deleted)
+                            sendDebug(`Message ${msg.message_id} already deleted or not found. Removing record.`);
+                            await deleteMessageRecord(msg.id);
+                            // Clean up log message if it exists
                             if (msg.log_message_id) {
                                 const debugChannel = await client.channels.fetch(client.debugChannelId);
                                 if (debugChannel) {
@@ -61,17 +67,19 @@ module.exports = (client) => {
                                 }
                             }
                         } else {
+                            // Deletion failed for another reason
                             await markMessageErrored(msg.id, fetchError.message);
-                            sendError(`Failed to fetch message ${msg.message_id}: ${fetchError.message}`);
+                            sendError(`Failed to fetch or delete message ${msg.message_id}: ${fetchError.message}`);
                         }
                     }
                 } else {
+                    // Channel not found or inaccessible
                     await markMessageErrored(msg.id, 'Channel inaccessible');
                     sendDebug(`Marked message ${msg.message_id} as errored due to inaccessible channel ${msg.channel_id}`);
                 }
             } catch (error) {
                 await markMessageErrored(msg.id, error.message);
-                sendError(`Failed to delete message ${msg.message_id}: ${error.message}`);
+                sendError(`Failed to process message ${msg.message_id}: ${error.message}`);
             }
         }
     };
