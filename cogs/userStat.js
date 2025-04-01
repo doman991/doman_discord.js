@@ -117,12 +117,24 @@ module.exports = (client) => {
                 return;
             }
 
+            // Fetch the user to get their tag for the embed title
+            let user;
+            try {
+                user = await client.users.fetch(userId);
+            } catch (error) {
+                const reply = await message.reply('Could not fetch user information. Please try again.');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000);
+                await insertMessageToDelete(message.channel.id, message.id, deleteAt, null);
+                await insertMessageToDelete(reply.channel.id, reply.id, deleteAt, null);
+                return;
+            }
+
             // Calculate words per message
             const wordsPerMessage = stats.total_messages > 0 ? (stats.total_words / stats.total_messages).toFixed(2) : 0;
 
             // Create an embed for stats display
             const embed = new EmbedBuilder()
-                .setTitle(`📊 User Stats: ${message.author.tag}`)
+                .setTitle(`📊 User Stats: ${user.tag}`) // Use the fetched user's tag
                 .setDescription(
                     `**ID**: ${userId}\n` +
                     `**Total Messages**: ${stats.total_messages}\n` +
