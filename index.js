@@ -12,13 +12,14 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildBans
     ]
 });
 
 // Store admin IDs and debug channel ID on the client for reference across cogs
-client.adminIds = ['333637419679219713', '241879263630852097'];
-client.debugChannelId = '1209916563512238169'; // Centralized debug channel ID
+client.adminIds = ['', ''];
+client.debugChannelId = ''; // Centralized debug channel ID
 
 client.debug = async (message) => {
     try {
