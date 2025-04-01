@@ -175,6 +175,11 @@ async function markMessageErrored(id, errorMessage) {
     await pool.execute(query, [errorMessage, id]);
 }
 
+async function deleteMessageRecord(id) {
+    const query = 'DELETE FROM messages_to_delete WHERE id = ?';
+    await pool.execute(query, [id]);
+}
+
 async function getMessageRecordByMessageId(messageId) {
     const query = 'SELECT id, channel_id, message_id, delete_at, log_message_id, status, error_log FROM messages_to_delete WHERE message_id = ?';
     const [rows] = await pool.execute(query, [messageId]);
@@ -402,6 +407,7 @@ module.exports = {
     getOverdueMessages,
     markMessageCompleted,
     markMessageErrored,
+    deleteMessageRecord, // Added this function to exports
     getMessageRecordByMessageId,
     addMovie,
     approveMovie,
@@ -424,5 +430,5 @@ module.exports = {
     startActivitySession,
     endActivitySession,
     getActivityStats,
-    pool // Add this line
+    pool
 };
