@@ -1,93 +1,208 @@
-const { getOverdueMessages, markMessageErrored, updateRemovalStats, deleteMessageRecord } = require('../database');
+const { EmbedBuilder } = require('discord.js');
+const { pool, normalizeGameName, getStandardGameName, addGameAlias } = require('../database'); // Adjust the path based on your directory structure
 
 module.exports = (client) => {
-    const INTERVAL_SECONDS = 10; // Run every 10 seconds (configurable)
+    const activeSessions = new Map(); // Track ongoing sessions: userId -> { activityName, startTime }
 
-    // Log only to console
-    const sendDebug = (message) => {
-        console.log(message);
-    };
+    // Handle presence updates (e.g., when a user starts or stops playing a game)
+    client.on('presenceUpdate', async (oldPresence, newPresence) => {
+        const userId = newPresence.userId;
+        const member = newPresence.member;
+        if (!member) return; // Ignore if not in guild
 
-    // Log errors to console and debug channel
-    const sendError = async (message) => {
-        console.error(message);
+        const nickname = member.displayName || member.user.username;
+        const playingActivity = newPresence.activities.find(a => a.type === 0); // Type 0 is "Playing"
+        const rawActivityName = playingActivity ? playingActivity.name : null;
+        const standardActivityName = rawActivityName ? await getStandardGameName(rawActivityName) : null;
+        const activeSession = activeSessions.get(userId);
+
         try {
-            const debugChannel = await client.channels.fetch(client.debugChannelId);
-            if (debugChannel) {
-                await debugChannel.send(message.slice(0, 2000));
+            if (standardActivityName) {
+                // User started or switched games
+                if (!activeSession || activeSession.activityName !== standardActivityName) {
+                    // End previous session if it exists
+                    if (activeSession) {
+                        const endTime = new Date().toISOString().replace('T', ' ').split('.')[0];
+                        await pool.execute(
+                            'UPDATE activities SET session_end = ? WHERE user_id = ? AND activity_name = ? AND session_end IS NULL ORDER BY session_start DESC LIMIT 1',
+                            [endTime, userId, activeSession.activityName]
+                        );
+                    }
+                    // Start new session with standard name
+                    const startTime = new Date().toISOString().replace('T', ' ').split('.')[0];
+                    await pool.execute(
+                        'INSERT INTO activities (user_id, nickname, activity_name, session_start) VALUES (?, ?, ?, ?)',
+                        [userId, nickname, standardActivityName, startTime]
+                    );
+                    activeSessions.set(userId, { activityName: standardActivityName, startTime });
+                    console.log(`Started session for user ${userId}: ${standardActivityName}`);
+                }
+            } else if (activeSession) {
+                // User stopped playing
+                const endTime = new Date().toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'UPDATE activities SET session_end = ? WHERE user_id = ? AND activity_name = ? AND session_end IS NULL ORDER BY session_start DESC LIMIT 1',
+                    [endTime, userId, activeSession.activityName]
+                );
+                activeSessions.delete(userId);
+                console.log(`Ended session for user ${userId}: ${activeSession.activityName}`);
             }
         } catch (error) {
-            console.error('Failed to send error to debug channel:', error);
+            console.error(`Error handling presence update for user ${userId}:`, error);
         }
-    };
+    });
 
-    // Delete overdue messages and manage database records
-    const deleteOverdueMessages = async () => {
-        const overdueMessages = await getOverdueMessages();
-        for (const msg of overdueMessages) {
+    // Handle message commands (!game and !galias)
+    client.on('messageCreate', async (message) => {
+        if (message.author.bot) return;
+        const args = message.content.split(' ').slice(1);
+        const command = message.content.split(' ')[0].toLowerCase();
+        const currentTimeMs = Date.now();
+
+        // Handle the !game command
+        if (command === '!game') {
+            let userId = args[0];
+            if (message.mentions.users.size > 0) {
+                userId = message.mentions.users.first().id;
+            } else if (!/^\d{17,19}$/.test(userId)) {
+                const reply = await message.reply('Invalid user ID or mention. Use a valid ID or @user.');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
+                return;
+            }
+
             try {
-                const channel = client.channels.cache.get(msg.channel_id);
-                if (channel) {
-                    try {
-                        // Fetch the message to confirm it exists
-                        const message = await channel.messages.fetch(msg.message_id);
-                        // Delete the message
-                        await message.delete();
-                        const deletionTime = new Date().toISOString().replace('T', ' ').split('.')[0];
-                        sendDebug(`Deleted message ${msg.message_id} at ${deletionTime}`);
+                // Fetch stats for all time, past month, and past week
+                const [allTimeRows] = await pool.execute(
+                    'SELECT activity_name, COUNT(*) as session_count, SUM(TIMESTAMPDIFF(SECOND, session_start, session_end)) as total_playtime ' +
+                    'FROM activities WHERE user_id = ? AND session_end IS NOT NULL GROUP BY activity_name',
+                    [userId]
+                );
+                const [monthRows] = await pool.execute(
+                    'SELECT activity_name, COUNT(*) as session_count, SUM(TIMESTAMPDIFF(SECOND, session_start, session_end)) as total_playtime ' +
+                    'FROM activities WHERE user_id = ? AND session_end IS NOT NULL AND session_start >= DATE_SUB(NOW(), INTERVAL 1 MONTH) GROUP BY activity_name',
+                    [userId]
+                );
+                const [weekRows] = await pool.execute(
+                    'SELECT activity_name, COUNT(*) as session_count, SUM(TIMESTAMPDIFF(SECOND, session_start, session_end)) as total_playtime ' +
+                    'FROM activities WHERE user_id = ? AND session_end IS NOT NULL AND session_start >= DATE_SUB(NOW(), INTERVAL 1 WEEK) GROUP BY activity_name',
+                    [userId]
+                );
 
-                        // Update removal stats for the bot
-                        await updateRemovalStats(client.user.id, 1);
+                // Build embed
+                const embed = new EmbedBuilder()
+                    .setTitle(`🎮 Activity Stats for ${message.guild.members.cache.get(userId)?.displayName || 'Unknown'}`)
+                    .setColor('#00b7ff')
+                    .addFields(
+                        { name: 'All Time', value: formatStats(allTimeRows), inline: false },
+                        { name: 'Past Month', value: formatStats(monthRows), inline: false },
+                        { name: 'Past Week', value: formatStats(weekRows), inline: false }
+                    );
 
-                        // Clean up log message if it exists
-                        if (msg.log_message_id) {
-                            const debugChannel = await client.channels.fetch(client.debugChannelId);
-                            if (debugChannel) {
-                                await debugChannel.messages.delete(msg.log_message_id);
-                                sendDebug(`Deleted log message ${msg.log_message_id}`);
-                                // Optionally count log message deletions too (uncomment if desired)
-                                // await updateRemovalStats(client.user.id, 1);
-                            }
-                        }
-
-                        // Remove the record from the database since deletion succeeded
-                        await deleteMessageRecord(msg.id);
-                    } catch (fetchError) {
-                        if (fetchError.code === 10008) { // Unknown Message (already deleted)
-                            sendDebug(`Message ${msg.message_id} already deleted or not found. Removing record.`);
-                            await deleteMessageRecord(msg.id);
-                            // Clean up log message if it exists
-                            if (msg.log_message_id) {
-                                const debugChannel = await client.channels.fetch(client.debugChannelId);
-                                if (debugChannel) {
-                                    await debugChannel.messages.delete(msg.log_message_id);
-                                    sendDebug(`Deleted log message ${msg.log_message_id} for non-existent message`);
-                                    // Optionally count log message deletions too (uncomment if desired)
-                                    // await updateRemovalStats(client.user.id, 1);
-                                }
-                            }
-                        } else {
-                            // Deletion failed for another reason
-                            await markMessageErrored(msg.id, fetchError.message);
-                            sendError(`Failed to fetch or delete message ${msg.message_id}: ${fetchError.message}`);
-                        }
-                    }
-                } else {
-                    // Channel not found or inaccessible
-                    await markMessageErrored(msg.id, 'Channel inaccessible');
-                    sendDebug(`Marked message ${msg.message_id} as errored due to inaccessible channel ${msg.channel_id}`);
-                }
+                const reply = await message.channel.send({ embeds: [embed] });
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
             } catch (error) {
-                await markMessageErrored(msg.id, error.message);
-                sendError(`Failed to process message ${msg.message_id}: ${error.message}`);
+                console.error(`Error processing !game for user ${userId}:`, error);
+                const reply = await message.reply('Failed to fetch stats. Please try again later.');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
             }
         }
-    };
 
-    // Run on startup and every INTERVAL_SECONDS
-    deleteOverdueMessages().catch(console.error);
-    setInterval(() => deleteOverdueMessages().catch(console.error), INTERVAL_SECONDS * 1000);
+        // Handle the !gAlias command (admin only)
+        if (command === '!galias') {
+            // Check if the user is an admin
+            if (!client.adminIds || !client.adminIds.includes(message.author.id)) {
+                const reply = await message.reply('Only admins can use this command.');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
+                return;
+            }
 
-    // Log when cog starts
-    console.log('autoRemove.js loaded and running');
+            // Parse arguments (expecting two quoted strings)
+            const match = message.content.match(/!galias\s+"([^"]+)"\s+"([^"]+)"/);
+            if (!match || match.length < 3) {
+                const reply = await message.reply('Usage: !galias "rawName" "standardName"');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
+                return;
+            }
+
+            const rawName = match[1];
+            const standardName = match[2];
+
+            try {
+                await addGameAlias(rawName, standardName);
+                const reply = await message.reply(`Alias added: "${rawName}" -> "${standardName}"`);
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
+            } catch (error) {
+                console.error(`Error adding alias for "${rawName}":`, error);
+                const reply = await message.reply('Failed to add alias. Please try again later.');
+                const deleteAt = new Date(currentTimeMs + 120 * 1000).toISOString().replace('T', ' ').split('.')[0];
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [message.channel.id, message.id, deleteAt]
+                );
+                await pool.execute(
+                    'INSERT INTO messages_to_delete (channel_id, message_id, delete_at) VALUES (?, ?, ?)',
+                    [reply.channel.id, reply.id, deleteAt]
+                );
+            }
+        }
+    });
+
+    // Helper function to format stats
+    function formatStats(stats) {
+        if (!stats || stats.length === 0) return 'No activities recorded.';
+        return stats.map(stat => {
+            const playtime = stat.total_playtime
+                ? `${Math.floor(stat.total_playtime / 3600)}h ${Math.floor((stat.total_playtime % 3600) / 60)}m`
+                : '0h 0m';
+            return `**${stat.activity_name}**: ${stat.session_count} sessions, ${playtime}`;
+        }).join('\n');
+    }
 };
