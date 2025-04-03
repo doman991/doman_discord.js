@@ -37,7 +37,8 @@ module.exports = (client) => {
                             '`!remove <count>`: Remove a specified number of messages (1-100) (Admins only).',
                             '`!timer <duration> [optional message]`: Set a countdown timer (e.g., `!timer 30m`) (Admins only).',
                             '`!user <userid> or !user @user`: Show user information (Admins only).',
-                            '`!swear <text>`: Add a swear word to the list (Admins only).'
+                            '`!swear <text>`: Add a swear word to the list (Admins only).',
+                            '`!galias "game1" "game2"`: Links two game names as aliases (Admins only).'
                         ].join('\n'),
                         inline: false
                     }
