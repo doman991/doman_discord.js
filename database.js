@@ -99,7 +99,7 @@ async function initDatabase() {
         `;
         await pool.execute(createRemovalStatsTableQuery);
 
-        // Create the user_stats table with new voice_chat_time and streaming_time columns
+        // Create the user_stats table with voice_chat_time and streaming_time columns
         const createUserStatsTableQuery = `
             CREATE TABLE IF NOT EXISTS user_stats (
                 user_id VARCHAR(255) PRIMARY KEY,
@@ -111,8 +111,8 @@ async function initDatabase() {
                 total_swears INT DEFAULT 0,
                 reactions_given INT DEFAULT 0,
                 reactions_received INT DEFAULT 0,
-                voice_chat_time BIGINT DEFAULT 0,  -- New column for voice chat time in seconds
-                streaming_time BIGINT DEFAULT 0,   -- New column for streaming time in seconds
+                voice_chat_time BIGINT DEFAULT 0,  -- Voice chat time in seconds
+                streaming_time BIGINT DEFAULT 0,   -- Streaming time in seconds
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
         `;
@@ -141,6 +141,15 @@ async function initDatabase() {
         `;
         await pool.execute(createSwearWordsTableQuery);
 
+        // Create the game_aliases table for mapping raw game names to standard names
+        const createGameAliasesTableQuery = `
+            CREATE TABLE IF NOT EXISTS game_aliases (
+                raw_name VARCHAR(255) PRIMARY KEY,
+                standard_name VARCHAR(255) NOT NULL
+            )
+        `;
+        await pool.execute(createGameAliasesTableQuery);
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Database initialization failed:', error);
@@ -148,7 +157,7 @@ async function initDatabase() {
     }
 }
 
-// Functions for messages_to_delete
+// **Functions for messages_to_delete**
 async function insertMessageToDelete(channelId, messageId, deleteAt, logMessageId = null) {
     const mysqlDateTime = new Date(deleteAt).toISOString().replace('T', ' ').split('.')[0];
     const query = `
@@ -195,7 +204,7 @@ async function getMessageRecordByMessageId(messageId) {
     return rows.length > 0 ? rows[0] : null;
 }
 
-// Functions for movies table
+// **Functions for movies table**
 async function addMovie(title) {
     const query = 'INSERT INTO movies (title) VALUES (?)';
     const [result] = await pool.execute(query, [title]);
@@ -254,7 +263,7 @@ async function getRandomMovie(daysCooldown) {
     return rows.length > 0 ? rows[0] : null;
 }
 
-// Functions for user_data table
+// **Functions for user_data table**
 async function upsertUserData(userId, roles = [], connections = 0, firstJoinDate = null, kicks = 0, bans = 0, inviterId = '0') {
     const mysqlDateTime = firstJoinDate ? new Date(firstJoinDate).toISOString().replace('T', ' ').split('.')[0] : '2024-03-10 00:00:00';
     const query = `
@@ -282,7 +291,7 @@ async function incrementUserField(userId, field) {
     await pool.execute(query, [userId]);
 }
 
-// Functions for message_removal_stats table
+// **Functions for message_removal_stats table**
 async function updateRemovalStats(userId, count) {
     const query = `
         INSERT INTO message_removal_stats (user_id, total_removed)
@@ -312,7 +321,7 @@ async function getUserRemovedMessages(userId) {
     return rows.length > 0 ? rows[0].total_removed : 0;
 }
 
-// Updated upsertUserStats function with COALESCE to handle NULL values
+// **Functions for user_stats table**
 async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edited = 0, swears = 0, reactionsGiven = 0, reactionsReceived = 0, voiceChatTime = 0, streamingTime = 0, nickname = null) {
     const query = `
         INSERT INTO user_stats (user_id, nickname, total_messages, total_words, messages_removed, messages_edited, total_swears, reactions_given, reactions_received, voice_chat_time, streaming_time)
@@ -351,16 +360,17 @@ async function getAllUserStats() {
     return rows;
 }
 
-// New functions for activities table
+// **Functions for activities table**
 async function startActivitySession(userId, nickname, activityName, startTime) {
+    const standardName = await getStandardGameName(activityName); // Use standard name
     const mysqlDateTime = new Date(startTime).toISOString().replace('T', ' ').split('.')[0];
     const query = `
         INSERT INTO activities (user_id, nickname, activity_name, session_start)
         VALUES (?, ?, ?, ?)
     `;
     try {
-        await pool.execute(query, [userId, nickname, activityName, mysqlDateTime]);
-        console.log(`Started activity session for user ${userId}: ${activityName}`);
+        await pool.execute(query, [userId, nickname, standardName, mysqlDateTime]);
+        console.log(`Started activity session for user ${userId}: ${standardName}`);
     } catch (error) {
         console.error(`Failed to start activity session for user ${userId}:`, error);
         throw error;
@@ -368,6 +378,7 @@ async function startActivitySession(userId, nickname, activityName, startTime) {
 }
 
 async function endActivitySession(userId, activityName, endTime) {
+    const standardName = await getStandardGameName(activityName); // Use standard name
     const mysqlDateTime = new Date(endTime).toISOString().replace('T', ' ').split('.')[0];
     const query = `
         UPDATE activities
@@ -377,8 +388,8 @@ async function endActivitySession(userId, activityName, endTime) {
         LIMIT 1
     `;
     try {
-        await pool.execute(query, [mysqlDateTime, userId, activityName]);
-        console.log(`Ended activity session for user ${userId}: ${activityName}`);
+        await pool.execute(query, [mysqlDateTime, userId, standardName]);
+        console.log(`Ended activity session for user ${userId}: ${standardName}`);
     } catch (error) {
         console.error(`Failed to end activity session for user ${userId}:`, error);
         throw error;
@@ -410,7 +421,7 @@ async function getActivityStats(userId, period = 'all') {
     }
 }
 
-// New functions for swear_words table
+// **Functions for swear_words table**
 async function addSwearWord(word) {
     const query = 'INSERT IGNORE INTO swear_words (word) VALUES (?)';
     await pool.execute(query, [word.toLowerCase()]);
@@ -426,6 +437,35 @@ async function checkSwearWordExists(word) {
     const query = 'SELECT COUNT(*) as count FROM swear_words WHERE word = ?';
     const [rows] = await pool.execute(query, [word.toLowerCase()]);
     return rows[0].count > 0;
+}
+
+// **Functions for game_aliases table**
+async function addGameAlias(rawName, standardName) {
+    const normalizedRaw = normalizeGameName(rawName);
+    const normalizedStandard = normalizeGameName(standardName);
+    const query = 'INSERT INTO game_aliases (raw_name, standard_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE standard_name = VALUES(standard_name)';
+    try {
+        await pool.execute(query, [normalizedRaw, normalizedStandard]);
+        console.log(`Added game alias: ${normalizedRaw} -> ${normalizedStandard}`);
+    } catch (error) {
+        console.error(`Failed to add game alias for ${normalizedRaw}:`, error);
+        throw error;
+    }
+}
+
+async function getStandardGameName(rawName) {
+    const normalizedRaw = normalizeGameName(rawName);
+    const query = 'SELECT standard_name FROM game_aliases WHERE raw_name = ?';
+    const [rows] = await pool.execute(query, [normalizedRaw]);
+    return rows.length > 0 ? rows[0].standard_name : normalizedRaw;
+}
+
+// **Helper function to normalize game names**
+function normalizeGameName(name) {
+    return name
+        .toLowerCase()
+        .replace(/™|®/g, '')
+        .trim();
 }
 
 module.exports = {
@@ -457,8 +497,11 @@ module.exports = {
     startActivitySession,
     endActivitySession,
     getActivityStats,
-    addSwearWord,   // Function to add a swear word
-    getSwearWords,  // Function to get all swear words
-    checkSwearWordExists, // Function to check if a swear word exists
+    addSwearWord,
+    getSwearWords,
+    checkSwearWordExists,
+    addGameAlias,        // New: Add a game alias
+    getStandardGameName, // New: Get standard game name
+    normalizeGameName,   // New: Normalize game names
     pool
 };
