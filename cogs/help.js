@@ -38,7 +38,7 @@ module.exports = (client) => {
                             '`!timer <duration> [optional message]`: Set a countdown timer (e.g., `!timer 30m`) (Admins only).',
                             '`!user <userid> or !user @user`: Show user information (Admins only).',
                             '`!swear <text>`: Add a swear word to the list (Admins only).',
-                            '`!galias "game1" "game2"`: Links two game names as aliases (Admins only).'
+                            '`!galias "standardName" "aliasName"`: Links an alias to a standard game name'
                         ].join('\n'),
                         inline: false
                     }
