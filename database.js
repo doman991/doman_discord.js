@@ -13,7 +13,7 @@ const pool = mysql.createPool({
 });
 
 // Log connection details for debugging
-console.log('Attempting to connect to MySQL with:', {
+console.log('[database] Attempting to connect to MySQL with:', {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     database: process.env.DB_NAME,
@@ -46,7 +46,7 @@ async function initDatabase() {
         `);
         if (rowsStatus.length === 0) {
             await pool.execute(`ALTER TABLE messages_to_delete ADD COLUMN status TINYINT DEFAULT 2`);
-            console.log('Added status column to messages_to_delete');
+            console.log('[database] Added status column to messages_to_delete');
         }
 
         // Check and add error_log column if it doesn’t exist
@@ -58,7 +58,7 @@ async function initDatabase() {
         `);
         if (rowsErrorLog.length === 0) {
             await pool.execute(`ALTER TABLE messages_to_delete ADD COLUMN error_log TEXT DEFAULT NULL`);
-            console.log('Added error_log column to messages_to_delete');
+            console.log('[database] Added error_log column to messages_to_delete');
         }
 
         // Create the movies table
@@ -150,9 +150,9 @@ async function initDatabase() {
         `;
         await pool.execute(createGameAliasesTableQuery);
 
-        console.log('Database initialized successfully');
+        console.log('[database] Database initialized successfully');
     } catch (error) {
-        console.error('Database initialization failed:', error);
+        console.error('[database] Database initialization failed:', error);
         throw error;
     }
 }
@@ -166,9 +166,9 @@ async function insertMessageToDelete(channelId, messageId, deleteAt, logMessageI
     `;
     try {
         await pool.execute(query, [channelId, messageId, mysqlDateTime, logMessageId]);
-        console.log(`Inserted message ${messageId} into messages_to_delete with delete_at ${mysqlDateTime}`);
+        console.log(`[database] Inserted message ${messageId} into messages_to_delete with delete_at ${mysqlDateTime}`);
     } catch (error) {
-        console.error(`Failed to insert message ${messageId} into messages_to_delete:`, error);
+        console.error(`[database] Failed to insert message ${messageId} into messages_to_delete:`, error);
         throw error;
     }
 }
@@ -302,9 +302,9 @@ async function updateRemovalStats(userId, count) {
     `;
     try {
         await pool.execute(query, [userId, count]);
-        console.log(`Updated removal stats for user ${userId}: added ${count} messages`);
+        console.log(`[database] Updated removal stats for user ${userId}: added ${count} messages`);
     } catch (error) {
-        console.error(`Failed to update removal stats for user ${userId}:`, error);
+        console.error(`[database] Failed to update removal stats for user ${userId}:`, error);
         throw error;
     }
 }
@@ -341,9 +341,9 @@ async function upsertUserStats(userId, messages = 0, words = 0, removed = 0, edi
     `;
     try {
         await pool.execute(query, [userId, nickname, messages, words, removed, edited, swears, reactionsGiven, reactionsReceived, voiceChatTime, streamingTime]);
-        console.log(`Updated stats for user ${userId}: messages +${messages}, words +${words}, removed +${removed}, edited +${edited}, swears +${swears}, reactions_given +${reactionsGiven}, reactions_received +${reactionsReceived}, voice_chat_time +${voiceChatTime}, streaming_time +${streamingTime}`);
+        console.log(`[database] Updated stats for user ${userId}: messages +${messages}, words +${words}, removed +${removed}, edited +${edited}, swears +${swears}, reactions_given +${reactionsGiven}, reactions_received +${reactionsReceived}, voice_chat_time +${voiceChatTime}, streaming_time +${streamingTime}`);
     } catch (error) {
-        console.error(`Failed to update stats for user ${userId}:`, error);
+        console.error(`[database] Failed to update stats for user ${userId}:`, error);
         throw error;
     }
 }
@@ -370,9 +370,9 @@ async function startActivitySession(userId, nickname, activityName, startTime) {
     `;
     try {
         await pool.execute(query, [userId, nickname, standardName, mysqlDateTime]);
-        console.log(`Started activity session for user ${userId}: ${standardName}`);
+        console.log(`[database] Started activity session for user ${userId}: ${standardName}`);
     } catch (error) {
-        console.error(`Failed to start activity session for user ${userId}:`, error);
+        console.error(`[database] Failed to start activity session for user ${userId}:`, error);
         throw error;
     }
 }
@@ -389,9 +389,9 @@ async function endActivitySession(userId, activityName, endTime) {
     `;
     try {
         await pool.execute(query, [mysqlDateTime, userId, standardName]);
-        console.log(`Ended activity session for user ${userId}: ${standardName}`);
+        console.log(`[database] Ended activity session for user ${userId}: ${standardName}`);
     } catch (error) {
-        console.error(`Failed to end activity session for user ${userId}:`, error);
+        console.error(`[database] Failed to end activity session for user ${userId}:`, error);
         throw error;
     }
 }
@@ -416,7 +416,7 @@ async function getActivityStats(userId, period = 'all') {
         const [rows] = await pool.execute(query, [userId]);
         return rows;
     } catch (error) {
-        console.error(`Failed to get activity stats for user ${userId}:`, error);
+        console.error(`[database] Failed to get activity stats for user ${userId}:`, error);
         throw error;
     }
 }
@@ -446,9 +446,9 @@ async function addGameAlias(rawName, standardName) {
     const query = 'INSERT INTO game_aliases (raw_name, standard_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE standard_name = VALUES(standard_name)';
     try {
         await pool.execute(query, [normalizedRaw, normalizedStandard]);
-        console.log(`Added game alias: ${normalizedRaw} -> ${normalizedStandard}`);
+        console.log(`[database] Added game alias: ${normalizedRaw} -> ${normalizedStandard}`);
     } catch (error) {
-        console.error(`Failed to add game alias for ${normalizedRaw}:`, error);
+        console.error(`[database] Failed to add game alias for ${normalizedRaw}:`, error);
         throw error;
     }
 }
