@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = (client) => {
-    const CHANNEL_ID = '';
-    const EMBED_MESSAGE_ID = ''; // Replace with your embed’s message ID
+    const CHANNEL_ID = '1345546588424245268';
+    const EMBED_MESSAGE_ID = '1345576571460784139'; // Replace with your embed’s message ID
 
     const roleMapping = {
         'diablo4': { roleId: '1345560992188465212', emojiId: '1345563858437275658' },
@@ -20,14 +20,14 @@ module.exports = (client) => {
     };
 
     async function sendOrUpdateEmbed() {
-        console.log('Attempting to fetch channel...');
+        console.log('[autoRanks] Attempting to fetch channel...');
         try {
             const channel = await client.channels.fetch(CHANNEL_ID);
             if (!channel) {
-                console.error('Channel not found with ID:', CHANNEL_ID);
+                console.error('[autoRanks] Channel not found with ID:', CHANNEL_ID);
                 return;
             }
-            console.log('Channel fetched successfully:', channel.name);
+            console.log('[autoRanks] Channel fetched successfully:', channel.name);
 
             const embed = new EmbedBuilder()
                 .setTitle('📰 Rangi: Aktualizacje Gier')
@@ -52,14 +52,14 @@ module.exports = (client) => {
 
             let message;
             try {
-                console.log('Attempting to fetch message with ID:', EMBED_MESSAGE_ID);
+                console.log('[autoRanks] Attempting to fetch message with ID:', EMBED_MESSAGE_ID);
                 message = await channel.messages.fetch(EMBED_MESSAGE_ID);
                 await message.edit({ embeds: [embed] });
-                console.log('Embed updated successfully.');
+                console.log('[autoRanks] Embed updated successfully.');
             } catch (fetchError) {
-                console.log('Failed to fetch message, sending a new one...');
+                console.log('[autoRanks] Failed to fetch message, sending a new one...');
                 message = await channel.send({ embeds: [embed] });
-                console.log('New embed message sent. ID:', message.id);
+                console.log('[autoRanks] New embed message sent. ID:', message.id);
             }
 
             // Add missing reactions from roleMapping
@@ -71,22 +71,22 @@ module.exports = (client) => {
                     const reaction = currentReactions.get(emojiId);
                     if (!reaction) {
                         await message.react(emoji);
-                        console.log(`Added reaction for ${key}`);
+                        console.log(`[autoRanks] Added reaction for ${key}`);
                     } else {
-                        console.log(`Reaction for ${key} already exists`);
+                        console.log(`[autoRanks] Reaction for ${key} already exists`);
                     }
                 } else {
-                    console.log(`Emoji ${emojiId} not found in cache`);
+                    console.log(`[autoRanks] Emoji ${emojiId} not found in cache`);
                 }
             }
         } catch (error) {
-            console.error('Error in sendOrUpdateEmbed:', error);
+            console.error('[autoRanks] Error in sendOrUpdateEmbed:', error);
         }
     }
 
     // Export initialization function
     module.exports.init = async (client) => {
-        console.log('Initializing autoRanks.js');
+        console.log('[autoRanks] Initializing autoRanks.js');
         await sendOrUpdateEmbed();
     };
 
@@ -101,7 +101,7 @@ module.exports = (client) => {
                 const member = reaction.message.guild.members.cache.get(user.id);
                 if (role && member) {
                     await member.roles.add(role);
-                    console.log(`Assigned role ${key} to ${user.tag}`);
+                    console.log(`[autoRanks] Assigned role ${key} to ${user.tag}`);
                 }
             }
         }
@@ -117,7 +117,7 @@ module.exports = (client) => {
                 const member = reaction.message.guild.members.cache.get(user.id);
                 if (role && member) {
                     await member.roles.remove(role);
-                    console.log(`Removed role ${key} from ${user.tag}`);
+                    console.log(`[autoRanks] Removed role ${key} from ${user.tag}`);
                 }
             }
         }
