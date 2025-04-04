@@ -19,7 +19,7 @@ module.exports = (client) => {
             for (const roleId of roles) {
                 const role = member.guild.roles.cache.get(roleId);
                 if (role && role.id !== member.guild.id) { // Exclude @everyone role
-                    await member.roles.add(role).catch(console.error);
+                    await member.roles.add(role).catch(error => console.error('[userTracker] Error adding role:', error));
                 }
             }
         }
