@@ -24,7 +24,7 @@ module.exports = (client) => {
                             '`!stat [user]`: Show user statistics (yours if no user specified).',
                             '`!allstat`: Show aggregated statistics for all users.',
                             '`!help`: Show this help message.',
-                            '`!game <userID> or !game @user`: Show gaming activity stats for a user.'
+                            '`!game <userID> or !game @user`: Show gaming activity stats for a user.',
                         ].join('\n'),
                         inline: false
                     },
@@ -38,7 +38,8 @@ module.exports = (client) => {
                             '`!timer <duration> [optional message]`: Set a countdown timer (e.g., `!timer 30m`) (Admins only).',
                             '`!user <userid> or !user @user`: Show user information (Admins only).',
                             '`!swear <text>`: Add a swear word to the list (Admins only).',
-                            '`!galias "standardName" "aliasName"`: Links an alias to a standard game name'
+                            '`!galias "standardName" "aliasName"`: Links an alias to a standard game name',
+                            '`!gstandard "current" "new"`: Changes the standard name of a game.'
                         ].join('\n'),
                         inline: false
                     }
@@ -54,9 +55,9 @@ module.exports = (client) => {
                 await insertMessageToDelete(message.channel.id, message.id, deleteAt, null);
                 await insertMessageToDelete(reply.channel.id, reply.id, deleteAt, null);
 
-                console.log(`Scheduled deletion for help command and response in channel ${message.channel.id}`);
+                console.log(`[help] Scheduled deletion for help command and response in channel ${message.channel.id}`);
             } catch (error) {
-                console.error('Error in help command:', error);
+                console.error('[help] Error in help command:', error);
                 await message.reply('Failed to process help command. Please try again later.');
             }
         }
