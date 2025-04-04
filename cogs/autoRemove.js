@@ -5,19 +5,19 @@ module.exports = (client) => {
 
     // Log only to console
     const sendDebug = (message) => {
-        console.log(message);
+        console.log(`[autoRemove] ${message}`);
     };
 
     // Log errors to console and debug channel
     const sendError = async (message) => {
-        console.error(message);
+        console.error(`[autoRemove] ${message}`);
         try {
             const debugChannel = await client.channels.fetch(client.debugChannelId);
             if (debugChannel) {
                 await debugChannel.send(message.slice(0, 2000));
             }
         } catch (error) {
-            console.error('Failed to send error to debug channel:', error);
+            console.error('[autoRemove] Failed to send error to debug channel:', error);
         }
     };
 
@@ -85,9 +85,9 @@ module.exports = (client) => {
     };
 
     // Run on startup and every INTERVAL_SECONDS
-    deleteOverdueMessages().catch(console.error);
-    setInterval(() => deleteOverdueMessages().catch(console.error), INTERVAL_SECONDS * 1000);
+    deleteOverdueMessages().catch(error => console.error('[autoRemove] Error on startup:', error));
+    setInterval(() => deleteOverdueMessages().catch(error => console.error('[autoRemove] Interval error:', error)), INTERVAL_SECONDS * 1000);
 
     // Log when cog starts
-    console.log('autoRemove.js loaded and running');
+    console.log('[autoRemove] autoRemove.js loaded and running');
 };
