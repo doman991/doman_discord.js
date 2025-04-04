@@ -150,6 +150,20 @@ async function initDatabase() {
         `;
         await pool.execute(createGameAliasesTableQuery);
 
+        // Create the bot_settings table
+        const createBotSettingsTableQuery = `
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                id INT PRIMARY KEY DEFAULT 1, -- Single row for bot settings
+                activity_type VARCHAR(50),
+                activity_text TEXT,
+                status VARCHAR(20),
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT single_row CHECK (id = 1) -- Ensures only one row
+            )
+        `;
+        await pool.execute(createBotSettingsTableQuery);
+        console.log('[database] Bot settings table created or verified');
+
         console.log('[database] Database initialized successfully');
     } catch (error) {
         console.error('[database] Database initialization failed:', error);
@@ -468,6 +482,32 @@ function normalizeGameName(name) {
         .trim();
 }
 
+// **Functions for bot_settings table**
+async function setBotSettings(activityType, activityText, status) {
+    const query = `
+        INSERT INTO bot_settings (id, activity_type, activity_text, status)
+        VALUES (1, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            activity_type = VALUES(activity_type),
+            activity_text = VALUES(activity_text),
+            status = VALUES(status),
+            last_updated = CURRENT_TIMESTAMP
+    `;
+    try {
+        await pool.execute(query, [activityType, activityText, status]);
+        console.log(`[database] Updated bot settings: activity_type=${activityType}, activity_text="${activityText}", status=${status}`);
+    } catch (error) {
+        console.error('[database] Failed to update bot settings:', error);
+        throw error;
+    }
+}
+
+async function getBotSettings() {
+    const query = 'SELECT activity_type, activity_text, status FROM bot_settings WHERE id = 1';
+    const [rows] = await pool.execute(query);
+    return rows.length > 0 ? rows[0] : null;
+}
+
 module.exports = {
     initDatabase,
     insertMessageToDelete,
@@ -500,8 +540,10 @@ module.exports = {
     addSwearWord,
     getSwearWords,
     checkSwearWordExists,
-    addGameAlias,        // New: Add a game alias
-    getStandardGameName, // New: Get standard game name
-    normalizeGameName,   // New: Normalize game names
-    pool
+    addGameAlias,
+    getStandardGameName,
+    normalizeGameName,
+    pool,
+    setBotSettings,  // New
+    getBotSettings   // New
 };
