@@ -17,12 +17,12 @@ module.exports = (client) => {
 
     // Log only to console
     const sendDebug = (message) => {
-        console.log(message);
+        console.log(`[clipOnly] ${message}`);
     };
 
     // Log to console and debug channel, returns the sent message
     const sendConfirmation = async (message) => {
-        console.log(message);
+        console.log(`[clipOnly] ${message}`);
         try {
             const debugChannel = await client.channels.fetch(client.debugChannelId);
             if (debugChannel) {
@@ -30,21 +30,21 @@ module.exports = (client) => {
                 return sentMessage;
             }
         } catch (error) {
-            console.error('Failed to send confirmation to debug channel:', error);
+            console.error('[clipOnly] Failed to send confirmation to debug channel:', error);
         }
         return null;
     };
 
     // Log errors to console and debug channel
     const sendError = async (message) => {
-        console.error(message);
+        console.error(`[clipOnly] ${message}`);
         try {
             const debugChannel = await client.channels.fetch(client.debugChannelId);
             if (debugChannel) {
                 await debugChannel.send(message.slice(0, 2000));
             }
         } catch (error) {
-            console.error('Failed to send error to debug channel:', error);
+            console.error('[clipOnly] Failed to send error to debug channel:', error);
         }
     };
 
