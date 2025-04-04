@@ -24,7 +24,7 @@ module.exports = (client) => {
             // Check if the user is an admin
             if (!client.adminIds.includes(message.author.id)) {
                 await message.reply('You are not authorized to use this command.');
-                console.log(`User ${message.author.id} attempted !remove but is not an admin`);
+                console.log(`[remove] User ${message.author.id} attempted !remove but is not an admin`);
                 return;
             }
 
@@ -65,16 +65,16 @@ module.exports = (client) => {
                 if (logChannel) {
                     await logChannel.send({ embeds: [embed] });
                 } else {
-                    console.warn('Debug channel not found');
+                    console.warn('[remove] Debug channel not found');
                 }
 
                 // Send a temporary confirmation message
                 const reply = await message.channel.send('Messages removed ✅');
                 setTimeout(() => {
-                    reply.delete().catch(error => console.error('Failed to delete reply:', error));
+                    reply.delete().catch(error => console.error('[remove] Failed to delete reply:', error));
                 }, 2000);
             } catch (error) {
-                console.error(`Error removing messages for ${message.author.id}:`, error);
+                console.error(`[remove] Error removing messages for ${message.author.id}:`, error);
                 await message.reply('Error removing messages. Check my permissions or try again.');
             }
         }
