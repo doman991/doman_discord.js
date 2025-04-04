@@ -55,8 +55,11 @@ module.exports = (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return; // Ignore bot messages
 
-        const args = message.content.split(' ').slice(1); // Extract arguments
-        const command = message.content.split(' ')[0].toLowerCase(); // Extract command
+        const prefix = '!'; // Define the command prefix
+        if (!message.content.startsWith(prefix)) return; // Ignore messages without the prefix
+
+        const args = message.content.slice(prefix.length).trim().split(' '); // Extract arguments after prefix
+        const command = args.shift().toLowerCase(); // Extract the command (e.g., "bothelp")
         const currentTimeMs = Date.now(); // Timestamp for deletion scheduling
 
         // Check if the user is an admin
@@ -68,8 +71,8 @@ module.exports = (client) => {
             return;
         }
 
-        // **Command: !bothelp**
-        if (command === '!bothelp') {
+        // **Command: bothelp**
+        if (command === 'bothelp') {
             const embed = new EmbedBuilder()
                 .setTitle('🤖 Bot Status Commands Help')
                 .setDescription('Here’s how to use the bot status commands. All commands are admin-only and messages will be deleted after 2 minutes.')
@@ -105,8 +108,8 @@ module.exports = (client) => {
             return;
         }
 
-        // **Command: !botActivity <type> <activity>**
-        if (command === '!botactivity') {
+        // **Command: botActivity <type> <activity>**
+        if (command === 'botactivity') {
             if (args.length < 2) {
                 const reply = await message.reply('Usage: `!botActivity <type> <activity>`, e.g., `!botActivity watching movies`');
                 const deleteAt = new Date(currentTimeMs + 120 * 1000);
@@ -147,8 +150,8 @@ module.exports = (client) => {
             }
         }
 
-        // **Command: !botStatus <status>**
-        if (command === '!botstatus') {
+        // **Command: botStatus <status>**
+        if (command === 'botstatus') {
             if (args.length < 1) {
                 const reply = await message.reply('Usage: `!botStatus <status>`, e.g., `!botStatus idle`');
                 const deleteAt = new Date(currentTimeMs + 120 * 1000);
@@ -191,8 +194,8 @@ module.exports = (client) => {
             }
         }
 
-        // **Command: !botDesc <description>**
-        if (command === '!botdesc') {
+        // **Command: botDesc <description>**
+        if (command === 'botdesc') {
             if (args.length < 1) {
                 const reply = await message.reply('Usage: `!botDesc <description>`, e.g., `!botDesc Playing with friends`');
                 const deleteAt = new Date(currentTimeMs + 120 * 1000);
