@@ -2,8 +2,6 @@ const { insertMessageToDelete } = require('../database');
 
 module.exports = (client) => {
     client.on('messageCreate', async (message) => {
-        // Log every time this event fires
-        console.log(`messageCreate event fired for message ${message.id} from ${message.author.tag}: ${message.content}`);
 
         // Ignore messages from bots
         if (message.author.bot) return;
@@ -52,9 +50,9 @@ module.exports = (client) => {
                     null // No log message
                 );
 
-                console.log(`Scheduled deletion: Error message ${errorMessage.id} in channel ${errorMessage.channel.id} at ${errorDeleteAt.toISOString()}, Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}`);
+                console.log(`[timer] Scheduled deletion: Error message ${errorMessage.id} in channel ${errorMessage.channel.id} at ${errorDeleteAt.toISOString()}, Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}`);
             } catch (error) {
-                console.error('Error handling invalid duration format:', error);
+                console.error('[timer] Error handling invalid duration format:', error);
                 await message.reply('Failed to process invalid format. Check my permissions or database!');
             }
             return;
@@ -92,9 +90,9 @@ module.exports = (client) => {
                         null // No log message
                     );
 
-                    console.log(`Scheduled deletion: Error message ${errorMessage.id} in channel ${errorMessage.channel.id} at ${errorDeleteAt.toISOString()}, Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}`);
+                    console.log(`[timer] Scheduled deletion: Error message ${errorMessage.id} in channel ${errorMessage.channel.id} at ${errorDeleteAt.toISOString()}, Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}`);
                 } catch (error) {
-                    console.error('Error handling invalid unit:', error);
+                    console.error('[timer] Error handling invalid unit:', error);
                     await message.reply('Failed to process invalid unit. Check my permissions or database!');
                 }
                 return;
@@ -137,9 +135,9 @@ module.exports = (client) => {
                 null // No log message
             );
 
-            console.log(`Scheduled deletion: Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}, Countdown message ${countdownMessage.id} in channel ${countdownMessage.channel.id} at ${new Date(deleteAtMs).toISOString()}`);
+            console.log(`[timer] Scheduled deletion: Command message ${message.id} in channel ${message.channel.id} at ${commandDeleteAt.toISOString()}, Countdown message ${countdownMessage.id} in channel ${countdownMessage.channel.id} at ${new Date(deleteAtMs).toISOString()}`);
         } catch (error) {
-            console.error('Error processing timer command:', error);
+            console.error('[timer] Error processing timer command:', error);
             await message.reply('Failed to set timer. Check my permissions or database connection!');
         }
     });
