@@ -18,25 +18,25 @@ const client = new Client({
 });
 
 // Store admin IDs and debug channel ID on the client for reference across cogs
-client.adminIds = ['', ''];
-client.debugChannelId = ''; // Centralized debug channel ID
+client.adminIds = ['333637419679219713', '241879263630852097'];
+client.debugChannelId = '1209916563512238169'; // Centralized debug channel ID
 
 client.debug = async (message) => {
     try {
         const debugChannel = await client.channels.fetch(client.debugChannelId);
         if (debugChannel) await debugChannel.send(message);
     } catch (error) {
-        console.error('Failed to send debug message:', error);
+        console.error('[Core] Failed to send debug message:', error);
     }
 };
 
 client.once('ready', async () => {
-    console.log(`Logged in as ${client.user.tag}`);
+    console.log(`[Core] Logged in as ${client.user.tag}`);
     try {
         await initDatabase();
-        console.log('Database initialized successfully');
+        console.log('[Core] Database initialized successfully');
     } catch (error) {
-        console.error('Database initialization failed:', error);
+        console.error('[Core] Database initialization failed:', error);
         await client.debug('Database failed to initialize. Bot functionality may be limited.');
         return;
     }
@@ -47,12 +47,12 @@ client.once('ready', async () => {
         const cogPath = `./cogs/${file}`;
         const cog = require(cogPath);
         cog(client); // Pass the client to the cog
-        console.log(`Loaded cog: ${file}`);
+        console.log(`[Core] Loaded cog: ${file}`);
         
         // Check if the cog has an init function and call it
         if (typeof cog.init === 'function') {
             await cog.init(client);
-            console.log(`Initialized cog: ${file}`);
+            console.log(`[Core] Initialized cog: ${file}`);
         }
     }
 });
