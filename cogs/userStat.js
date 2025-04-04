@@ -6,9 +6,9 @@ module.exports = (client) => {
     let swearWords = new Set();
     getSwearWords().then(words => {
         swearWords = new Set(words);
-        console.log('Swear words loaded from database');
+        console.log('[userStat] Swear words loaded from database');
     }).catch(error => {
-        console.error('Failed to load swear words from database:', error);
+        console.error('[userStat] Failed to load swear words from database:', error);
     });
 
     // Maps to track voice chat and streaming start times
@@ -138,7 +138,7 @@ module.exports = (client) => {
                 await insertMessageToDelete(message.channel.id, message.id, deleteAt, null);
                 await insertMessageToDelete(reply.channel.id, reply.id, deleteAt, null);
             } catch (error) {
-                console.error('Failed to add swear word:', error);
+                console.error('[userStat] Failed to add swear word:', error);
                 const reply = await message.reply('Failed to add swear word. Please try again later.');
                 const deleteAt = new Date(currentTimeMs + 120 * 1000);
                 await insertMessageToDelete(message.channel.id, message.id, deleteAt, null);
