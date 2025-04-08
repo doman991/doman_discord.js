@@ -24,6 +24,7 @@ module.exports = (client) => {
                             '`!stat [user]`: Show user statistics (yours if no user specified).',
                             '`!allstat`: Show aggregated statistics for all users.',
                             '`!help`: Show this help message.',
+                            '`!serialhelp`: Show this help message.',
                             '`!game <userID> or !game @user`: Show gaming activity stats for a user.',
                         ].join('\n'),
                         inline: false
@@ -39,6 +40,7 @@ module.exports = (client) => {
                             '`!user <userid> or !user @user`: Show user information (Admins only).',
                             '`!swear <text>`: Add a swear word to the list (Admins only).',
                             '`!galias "standardName" "aliasName"`: Links an alias to a standard game name',
+                            '`!bothelp commands to change bot`s activity status',
                             '`!gstandard "current" "new"`: Changes the standard name of a game.'
                         ].join('\n'),
                         inline: false
