@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
 const config = require('./config.json');
 const { initDatabase } = require('./database');
+const { initDatabase2 } = require('./database2'); // Added new import
 require('dotenv').config();
 
 const client = new Client({
@@ -35,6 +36,8 @@ client.once('ready', async () => {
     try {
         await initDatabase();
         console.log('[Core] Database initialized successfully');
+        await initDatabase2(); // Initialize the new database
+        console.log('[Core] Database2 initialized successfully');
     } catch (error) {
         console.error('[Core] Database initialization failed:', error);
         await client.debug('Database failed to initialize. Bot functionality may be limited.');
