@@ -56,21 +56,32 @@ module.exports = (client) => {
             return;
         }
 
-        // Video detection logic
+        // Define video and image extensions
         const videoExtensions = ['mp4', 'mov', 'webm', 'avi', 'mkv'];
-        const hasVideo = message.attachments.some(att => {
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff'];
+
+        // Check if the message has at least one video or image attachment
+        const hasVideoOrImage = message.attachments.some(att => {
             const extension = getExtension(att.url);
+
             const isVideoByExtension = videoExtensions.includes(extension);
             const isVideoByContentType = att.contentType?.startsWith('video/') || false;
             const isVideoByName = att.name ? videoExtensions.some(ext => att.name.toLowerCase().endsWith(`.${ext}`)) : false;
 
-            const debugMsg = `Checking: URL=${att.url}, Ext=${extension}, Type=${att.contentType}, Name=${att.name}, VideoByExt=${isVideoByExtension}, VideoByType=${isVideoByContentType}, VideoByName=${isVideoByName}`;
+            const isImageByExtension = imageExtensions.includes(extension);
+            const isImageByContentType = att.contentType?.startsWith('image/') || false;
+            const isImageByName = att.name ? imageExtensions.some(ext => att.name.toLowerCase().endsWith(`.${ext}`)) : false;
+
+            const debugMsg = `Checking: URL=${att.url}, Ext=${extension}, Type=${att.contentType}, Name=${att.name}, ` +
+                             `VideoByExt=${isVideoByExtension}, VideoByType=${isVideoByContentType}, VideoByName=${isVideoByName}, ` +
+                             `ImageByExt=${isImageByExtension}, ImageByType=${isImageByContentType}, ImageByName=${isImageByName}`;
             sendDebug(debugMsg);
 
-            return isVideoByExtension || isVideoByContentType || isVideoByName;
+            return isVideoByExtension || isVideoByContentType || isVideoByName ||
+                   isImageByExtension || isImageByContentType || isImageByName;
         });
 
-        if (hasVideo) {
+        if (hasVideoOrImage) {
             try {
                 await message.react('✅');
                 await sendDebug(`Added ✅ to message ${message.id}`);
@@ -78,7 +89,7 @@ module.exports = (client) => {
                 await sendError(`Failed to react to ${message.id}: ${error.message}`);
             }
         } else {
-            // Schedule deletion for non-video messages
+            // Schedule deletion for messages without video or image attachments
             const deleteTime = Math.floor((Date.now() + DELETION_DELAY_HOURS * 60 * 60 * 1000) / 1000);
             const deleteAt = new Date(Date.now() + DELETION_DELAY_HOURS * 60 * 60 * 1000);
 
